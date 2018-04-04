@@ -3,7 +3,11 @@ var querystring = require('querystring');
 const crypto = require('crypto');
 const fs = require('fs');
 var devid='';																						//Device id : Which is send from the board
-var validDeviceId = ['RPI1', 'RPI2', 'RPI3', 'RPI4', 'RPI5', 'RPI6'];								// List of Valid device IDs 
+var validDeviceId = ['RPI1', 'RPI2', 'RPI3', 'RPI4', 'RPI5', 'RPI6'];	// List of Valid device IDs 
+var key='ed02457b5c41d964dbd2f2a609d63fe1bb7528dbe55e1abf5b52c249cd735797';	
+var tempkey = '';
+var lastkey = '';
+var keystr= 'aaa';
 var dataStore = new  Object();
 const PORT = process.env.PORT || 8080;
   
@@ -18,44 +22,58 @@ fs.appendFile('Rouge.txt', 'Sl.No.  Dev-ID    Pkt-No:\t\tData\t\t\t\t\tHash\n');
 var sl3
 
 function handleRequest(request, response){
-    response.end('\nServer working properly. Requested URL :' + request.url);
-    
+    //response.end('\nServer working properly. Requested URL :' + request.url);
     request.on('data', function (data)										
-        {			
-            jsonParsed = JSON.parse(data); 															//Json parsed data recieved from the client
-            devid = jsonParsed.DevId; 
-            pktno = jsonParsed.PacketNo;
-            console.log('\nThis data is recieved from Device : '+"'"+devid+"'"+', Recieved Packet Number : '+pktno);       
-            if(validDeviceId.indexOf(jsonParsed.DevId) != -1)										//returns  the index if match is found returns -1 if match is not found
-			{	
-				if(dataStore[devid]== undefined || dataStore[devid].data1=='')
+	{			
+		jsonParsed = JSON.parse(data); 															//Json parsed data recieved from the client
+		devid = jsonParsed.DevId; 
+		pktno = jsonParsed.PacketNo;
+		console.log('\nRecieved Packet Number : '+pktno+'  || Device-ID : '+"'"+devid+"'\n");       
+		if(validDeviceId.indexOf(jsonParsed.DevId) != -1)										//returns  the index if match is found returns -1 if match is not found
+		{	
+			if(dataStore[devid]== undefined || dataStore[devid].data1=='')
+			{
+				dataStore[devid ]= new Object();												//creates a new object only once when data is rceved fro a new device.			
+				dataStore[devid].data1 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
+				dataStore[devid].dhash1=jsonParsed.SHA256Hash;
+				dataStore[devid].pktno=jsonParsed.PacketNo;
+				console.log('Data-1 : '+dataStore[devid].data1);
+				console.log('Data-1 hash: '+dataStore[devid].dhash1);
+				if(dataStore[devid].dhash1==crypto.createHash('sha256').update(key+dataStore[devid].data1).digest('hex'))
 				{
-					dataStore[devid ]= new Object();												//creates a new object only once when data is rceved fro a new device.			
-					dataStore[devid].data1 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
-					dataStore[devid].dhash1=jsonParsed.SHA256Hash;
-					console.log('\nData-1: '+dataStore[devid].data1);
+					tempkey=keygenerator();
+					testpktno=jsonParsed.PacketNo;
+					console.log('\n1st Key generated : '+tempkey+'\n\n');
 					response.writeHead(200, { 'Content-Type': 'text/plain'});
-					response.end('Hello Node.js Server has recived the data');
+					response.end('Hello Node.js Server has recived the first data, '+tempkey);
 				}
-				else
+			}
+			else
+			{
+				if(testpktno+1==pktno && pktno%5!=0)
 				{
-					//lastvalidpacket=dataStore[devid].data1;
 					dataStore[devid].data2 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
 					dataStore[devid].dhash2=jsonParsed.SHA256Hash;
-					
-					console.log('\nData1: '+dataStore[devid].data1);
+					dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;
+
+					console.log('Data1: '+dataStore[devid].data1);
 					console.log('Data2: '+dataStore[devid].data2);
-					
-					dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;					
-					
-					dataStore[devid].Servhash=crypto.createHash('sha256').update(dataStore[devid].concdata).digest('hex');
-					
-					console.log('Composed-Data : '+dataStore[devid].concdata);
+
+					tempkey=keygenerator();
+					feed=key+dataStore[devid].concdata;
+					console.log('\nCdata : '+feed);
+					console.log('Recieved-hash: '+dataStore[devid].dhash2);
+					console.log('\nNew key generated '+tempkey);
+					console.log('Key used to hash :'+key);
+					dataStore[devid].Servhash=crypto.createHash('sha256').update(feed).digest('hex');
+						
 					console.log('\nServer Hash : '+dataStore[devid].Servhash);
-					console.log('Client Hash : '+dataStore[devid].dhash1);
-					if(dataStore[devid].Servhash==dataStore[devid].dhash1)
+					console.log('Client Hash : '+dataStore[devid].dhash2);
+					if(dataStore[devid].Servhash==dataStore[devid].dhash2)
 					{
-						console.log('\n\t\tData Validated');
+						testpktno=jsonParsed.PacketNo;
+						console.log('\n\t\tData Validated\n');
+						console.log('*****************************************************************************\n');
 						fs.appendFile('Valid.txt',sl1+'\t  '+devid+'     |'+pktno+'|\t\t'+dataStore[devid].data1+'\t'+dataStore[devid].dhash1+'\n' , (err) =>
 						{ 
 							if (err) throw err;
@@ -63,6 +81,8 @@ function handleRequest(request, response){
 						});
 						dataStore[devid].dhash1=dataStore[devid].dhash2;
 						dataStore[devid].data1=dataStore[devid].data2;
+						response.writeHead(200, { 'Content-Type': 'text/plain'});
+						response.end('Data is validated : Block is added to the Chain, '+tempkey+'\n');
 					}
 					else
 					{
@@ -74,39 +94,102 @@ function handleRequest(request, response){
 						console.log('\n\t      ----------------------------------------------------');
 						console.log('\t******Invalid Packet :Block did not get added to the Chain******');
 						console.log('\t      ----------------------------------------------------');
+						tempkey=lastkey;
 					}
-					//response.setHeader('Content-Type', 'text/html');
+
 					response.writeHead(200, { 'Content-Type': 'text/plain'});
-					response.end('Server has received the message');
-					
-				/*	response.writeHead(200, { 'Content-Type': 'text/plain','Trailer': 'Server-Message' });
-					response.addTrailers({ 'Server-Message': 'Ok' });
-					response.end();  */
+					response.end('Server could not validate the packet : Block did not get added to the Chain, **CONTACT THE ADMINISTRATOR TO RESTART THE BLOCKCHAIN** ');
 				}
-			} 					
-			else
-			{
-				fs.appendFile('Rouge.txt',sl3+'\t  '+devid+'     |'+pktno+'|\t\t'+jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI+'\t'+jsonParsed.SHA256Hash+'\n' , (err) =>
-				{ 
-					if (err) throw err;
-						sl3+=1;
-				});
-				console.log('\n\t#####################################################');
-				console.log('\t# Data Recieved  from an Invalid Device ID -> '+ '"'+devid+'"'+' #');
-				console.log('\t#####################################################');		
-				
-				//response.setHeader('Content-Type', 'text/html');
-				response.writeHead(200, { 'Content-Type': 'text/plain'});
-				response.end('Invalid Device  ID |Administrator will be notified');
+				else if(testpktno+1==pktno && pktno%5==0)
+				{
+					lastkey=tempkey;
+					tempkey=keygenerator();
+					
+					key=crypto.createHash('sha256').update(key+lastkey).digest('hex');
+					dataStore[devid].data2 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
+					dataStore[devid].dhash2=jsonParsed.SHA256Hash;
+					dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;	
+					feed=key+dataStore[devid].concdata;
+					console.log('Data1: '+dataStore[devid].data1);
+					console.log('Data2: '+dataStore[devid].data2);
+					console.log('\nCdata : '+feed);
+					console.log('Recieved-hash: '+dataStore[devid].dhash2);
+					console.log('\nNew key generated '+tempkey);
+					console.log('Key used to hash :'+key);
+					dataStore[devid].Servhash=crypto.createHash('sha256').update(feed).digest('hex');
+
+					console.log('\nServer Hash : '+dataStore[devid].Servhash);
+					console.log('Client Hash : '+dataStore[devid].dhash2);
+					if(dataStore[devid].Servhash==dataStore[devid].dhash2)
+					{
+						testpktno=jsonParsed.PacketNo;
+						console.log('\n\t\tData Validated\n');
+						console.log('*****************************************************************************\n\n');
+						fs.appendFile('Valid.txt',sl1+'\t  '+devid+'     |'+pktno+'|\t\t'+dataStore[devid].data1+'\t'+dataStore[devid].dhash1+'\n' , (err) =>
+						{ 
+							if (err) throw err;
+							sl1+=1;
+						});
+
+						dataStore[devid].dhash1=dataStore[devid].dhash2;
+						dataStore[devid].data1=dataStore[devid].data2;
+						response.writeHead(200, { 'Content-Type': 'text/plain'});
+						response.end('Data is validated : Block is added to the Chain, '+tempkey+'\n');
+					}
+					else
+					{
+						console.log('\n\t      ----------------------------------------------------');
+						console.log('\t******Invalid Packet :Block did not get added to the Chain******');
+						console.log('\t      ----------------------------------------------------');
+						tempkey=lastkey;
+					}
+					response.writeHead(200, { 'Content-Type': 'text/plain'});
+					response.end('Server could not validate the packet : Block did not get added to the Chain, **CONTACT THE ADMINISTRATOR TO RESTART THE BLOCKCHAIN** ');	
+				}
+				else
+				{
+					console.log('\n\t      ----------------------------------------------------');
+					console.log('\t******Invalid Packet :Block did not get added to the Chain******');
+					console.log('\t      ----------------------------------------------------');
+					response.writeHead(200, { 'Content-Type': 'text/plain'});
+					response.end('Server could not validate the packet : Block did not get added to the Chain, **CONTACT THE ADMINISTRATOR TO RESTART THE BLOCKCHAIN** ');
+				}			
 			}
-							 
-        });
+		} 					
+		else
+		{
+			fs.appendFile('Rouge.txt',sl3+'\t  '+devid+'     |'+pktno+'|\t\t'+jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI+'\t'+jsonParsed.SHA256Hash+'\n' , (err) =>
+			{ 
+				if (err) throw err;
+					sl3+=1;
+			});
+			console.log('\n\t#####################################################');
+			console.log('\t# Data Recieved  from an Invalid Device ID -> '+ '"'+devid+'"'+' #');
+			console.log('\t#####################################################');		
+			
+			response.setHeader('Content-Type', 'text/html');
+			response.writeHead(200, { 'Content-Type': 'text/plain'});
+			response.end('Invalid Device  ID |Administrator will be notified, **CONTACT THE ADMINISTRATOR TO RESTART THE BLOCKCHAIN** ');
+		}
+							
+	});
   
 }
-//http.createServer(function(request, response)
+
+function keygenerator() 
+{
+    s= keystr;
+	if(keystr!=='zzz') {
+		keystr= ((parseInt(keystr, 36)+1).toString(36)).replace(/0/g,'a');
+		s= ' '+keystr;
+	}
+	keystr=s
+	return crypto.createHash('sha256').update(s).digest('hex');
+} 
+
 const server = http.createServer(handleRequest)
 
 
 server.listen(PORT, () => {
-  console.log('Server listening on: http://localhost:%s', PORT);
+  console.log('\tThe Blockchain Server has stared \n\n The Server is listening on: http://localhost:%s\n', PORT);
 });
