@@ -8,6 +8,7 @@ var key='ed02457b5c41d964dbd2f2a609d63fe1bb7528dbe55e1abf5b52c249cd735797';
 var tempkey = '';
 var lastkey = '';
 var keystr= 'aaa';
+
 var dataStore = new  Object();
 const PORT = process.env.PORT || 8080;
   
@@ -21,15 +22,19 @@ fs.writeFile('Rouge.txt', '\t\t\t\tRouge Devices\n\n');
 fs.appendFile('Rouge.txt', 'Sl.No.  Dev-ID    Pkt-No:\t\tData\t\t\t\t\tHash\n');
 var sl3
 
+var jfile = fs.readFileSync("/root/Desktop/RealtimeBC/server/devices.json", "utf8");
+datalist = JSON.parse(jfile);  //deviceid" : "RPI5","key","keystrng"
+
 function handleRequest(request, response){
     //response.end('\nServer working properly. Requested URL :' + request.url);
+    
     request.on('data', function (data)										
 	{			
 		jsonParsed = JSON.parse(data); 															//Json parsed data recieved from the client
 		devid = jsonParsed.DevId; 
 		pktno = jsonParsed.PacketNo;
 		console.log('\nRecieved Packet Number : '+pktno+'  || Device-ID : '+"'"+devid+"'\n");       
-		if(validDeviceId.indexOf(jsonParsed.DevId) != -1)										//returns  the index if match is found returns -1 if match is not found
+		if(validDeviceId.indexOf(jsonParsed.DevId) != -1)												//datalist.deviceid==jsonParsed.DevId)		//		if(datalist.hasOwnProperty('devid')!=-1)//							//returns  the index if match is found returns -1 if match is not found
 		{	
 			if(dataStore[devid]== undefined || dataStore[devid].data1=='')
 			{
@@ -37,9 +42,11 @@ function handleRequest(request, response){
 				dataStore[devid].data1 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
 				dataStore[devid].dhash1=jsonParsed.SHA256Hash;
 				dataStore[devid].pktno=jsonParsed.PacketNo;
+				dataStore[devid].keystr=datalist[devid]["keystring"]
+				dataStore[devid].hashkey=datalist[devid]["key"]
 				console.log('Data-1 : '+dataStore[devid].data1);
 				console.log('Data-1 hash: '+dataStore[devid].dhash1);
-				if(dataStore[devid].dhash1==crypto.createHash('sha256').update(key+dataStore[devid].data1).digest('hex'))
+				if(dataStore[devid].dhash1==crypto.createHash('sha256').update(dataStore[devid].hashkey+dataStore[devid].data1).digest('hex'))
 				{
 					tempkey=keygenerator();
 					testpktno=jsonParsed.PacketNo;
@@ -54,17 +61,17 @@ function handleRequest(request, response){
 				{
 					dataStore[devid].data2 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
 					dataStore[devid].dhash2=jsonParsed.SHA256Hash;
-					dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;
+					//dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;
 
-					console.log('Data1: '+dataStore[devid].data1);
-					console.log('Data2: '+dataStore[devid].data2);
+					//console.log('Data1: '+dataStore[devid].data1);
+					console.log('Data: '+dataStore[devid].data2);
 
 					tempkey=keygenerator();
-					feed=key+dataStore[devid].concdata;
-					console.log('\nCdata : '+feed);
-					console.log('Recieved-hash: '+dataStore[devid].dhash2);
+					feed=dataStore[devid].hashkey+dataStore[devid].data2+dataStore[devid].dhash1;
+					//console.log('\nCdata : '+feed);
+					//console.log('Recieved-hash: '+dataStore[devid].dhash2);
 					console.log('\nNew key generated '+tempkey);
-					console.log('Key used to hash :'+key);
+					console.log('Key used to hash :'+dataStore[devid].hashkey);
 					dataStore[devid].Servhash=crypto.createHash('sha256').update(feed).digest('hex');
 						
 					console.log('\nServer Hash : '+dataStore[devid].Servhash);
@@ -105,17 +112,17 @@ function handleRequest(request, response){
 					lastkey=tempkey;
 					tempkey=keygenerator();
 					
-					key=crypto.createHash('sha256').update(key+lastkey).digest('hex');
+					dataStore[devid].hashkey=crypto.createHash('sha256').update(dataStore[devid].hashkey+lastkey).digest('hex');
 					dataStore[devid].data2 = jsonParsed.Sdata+jsonParsed.TimeS+jsonParsed.RSSI;
 					dataStore[devid].dhash2=jsonParsed.SHA256Hash;
-					dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;	
-					feed=key+dataStore[devid].concdata;
-					console.log('Data1: '+dataStore[devid].data1);
-					console.log('Data2: '+dataStore[devid].data2);
-					console.log('\nCdata : '+feed);
+					//dataStore[devid].concdata = dataStore[devid].data1 + dataStore[devid].data2;	
+					feed=dataStore[devid].hashkey+dataStore[devid].data2+dataStore[devid].dhash1;
+					//console.log('Data1: '+dataStore[devid].data1);
+					console.log('Data: '+dataStore[devid].data2);
+					//console.log('\nCdata : '+feed);
 					console.log('Recieved-hash: '+dataStore[devid].dhash2);
 					console.log('\nNew key generated '+tempkey);
-					console.log('Key used to hash :'+key);
+					console.log('Key used to hash :'+dataStore[devid].hashkey);
 					dataStore[devid].Servhash=crypto.createHash('sha256').update(feed).digest('hex');
 
 					console.log('\nServer Hash : '+dataStore[devid].Servhash);
@@ -178,10 +185,10 @@ function handleRequest(request, response){
 
 function keygenerator() 
 {
-    s= keystr;
-	if(keystr!=='zzz') {
-		keystr= ((parseInt(keystr, 36)+1).toString(36)).replace(/0/g,'a');
-		s= ' '+keystr;
+    s= dataStore[devid].keystr;
+	if(dataStore[devid].keystr!=='zzz') {
+		dataStore[devid].keystr= ((parseInt(dataStore[devid].keystr, 36)+1).toString(36)).replace(/0/g,'a');
+		s= ' '+dataStore[devid].keystr;
 	}
 	keystr=s
 	return crypto.createHash('sha256').update(s).digest('hex');
@@ -191,5 +198,5 @@ const server = http.createServer(handleRequest)
 
 
 server.listen(PORT, () => {
-  console.log('\tThe Blockchain Server has stared \n\n The Server is listening on: http://localhost:%s\n', PORT);
+  console.log('\tThe Blockchain Server has started \n\n The Server is listening on: http://localhost:%s\n', PORT);
 });
