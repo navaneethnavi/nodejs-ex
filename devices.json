@@ -1,0 +1,51 @@
+{
+	"RPI1" :
+					{		"deviceid" : "RPI1",
+							"key" : "a3b709735c4dddb7ea530c1a875f0411799979cd3e44d853c606303d1bf963df",
+							"keystring" : "hjkq"
+					}
+				,
+	"RPI2" :
+				{ 
+					"deviceid" : "RPI2",
+					"key" : "95b459b817f55513cc3c3387dd957ce0bcc4fda934728cad2702eed1013ef125",
+					"keystring" : "loka"	
+				}
+				,
+	"RPI3" :			
+				{ 
+					"deviceid" : "RPI3",
+					"key" : "e641bc02631ea002ae87f7bd3b9c1fd1e20f23dcaad55cf6fc69bddbfb535701",
+					"keystring" : "conr"	
+				}
+			,
+	"RPI4" :
+				{ 
+					"deviceid" : "RPI4",
+					"key" : "eec3395cf73775f85d214c674be5d953193917af21fda3731c48a581f1bd058b",
+					"keystring" : "jkac"	
+				}
+			,
+	"RPI5" :
+				{ 
+					"deviceid" : "RPI5",
+					"key" : "85539389db2dd7f465c8077b3e83f7cc17b71de3b6bd9e9939287c02a030a536",
+					"keystring" : "bcfa"	
+				}
+			,
+	"RPI6" :
+				{ 
+					"deviceid" : "RPI6",
+					"key" : "385b8dc44b0b88f09dcafef6cbab23e047eec32e0f9b78be3df82a842dd9376b",
+					"keystring" : "deoc"	
+				},
+			
+	"RPI7" :
+				{ 
+					"deviceid" : "RPI7",
+					"key" : "9b8583ec79c28cd61a93a9ec4978f3c3f491c707a56187a8a17b648e1feecd2d",	
+					"keystring" : "kecd"	
+				}
+			
+}
+
