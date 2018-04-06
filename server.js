@@ -22,7 +22,7 @@ fs.writeFile('Rouge.txt', '\t\t\t\tRouge Devices\n\n');
 fs.appendFile('Rouge.txt', 'Sl.No.  Dev-ID    Pkt-No:\t\tData\t\t\t\t\tHash\n');
 var sl3
 
-var jfile = fs.readFileSync("/root/Desktop/RealtimeBC/server/devices.json", "utf8");
+var jfile = fs.readFileSync("devices.json", "utf8");
 datalist = JSON.parse(jfile);  //deviceid" : "RPI5","key","keystrng"
 
 function handleRequest(request, response){
